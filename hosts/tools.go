@@ -3,19 +3,23 @@ package hosts
 import "strings"
 
 func ownerAndRepoSSH(remote string) (string, string) {
-	splitted := strings.Split(remote, "/")
+	splitted := strings.FieldsFunc(remote, func(r rune) bool {
+		return r == ':' || r == '/' || r == '.'
+	})
 
-	return strings.TrimLeft(splitted[0], ":"), strings.TrimRight(splitted[1], ".")
+	return splitted[2], splitted[3]
 }
 
 func ownerAndRepoHTTP(remote string) (string, string) {
-	splitted := strings.Split(remote, "/")
+	splitted := strings.FieldsFunc(remote, func(r rune) bool {
+		return r == '/' || r == '.'
+	})
 
-	return splitted[4], strings.TrimRight(splitted[5], ".")
+	return splitted[3], splitted[4]
 }
 
 func ownerAndRepo(remote string) (string, string) {
-	if strings.HasPrefix("http") {
+	if strings.HasPrefix(remote, "http") {
 		return ownerAndRepoHTTP(remote)
 	}
 	return ownerAndRepoSSH(remote)

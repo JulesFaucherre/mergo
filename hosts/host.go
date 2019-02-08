@@ -2,18 +2,37 @@ package hosts
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"gitlab.com/jfaucherre/mergo/models"
 )
 
-var hosts = map[string]func() Host{
-	"github": newGithub,
+var hosts = map[*regexp.Regexp]func() (Host, error){
+	regexp.MustCompile("[http://|https://]?[www.]?github[.com]?"): newGithub,
+	regexp.MustCompile("[http://|https://]?[www.]?gitlab[.com]?"): newGitlab,
 }
 
 type Host interface {
-	SubmitPr(models.Opts) error
+	SubmitPr(*models.Opts) error
 	GetOwnerAndRepo(string) (string, string)
+}
+
+func GetHost(host string) (Host, error) {
+	for h, builder := range hosts {
+		if h.MatchString(host) {
+			return builder()
+		}
+	}
+	return nil, fmt.Errorf("Not host for %s", host)
+}
+
+func GetHostNameFromRemoteString(remote string) string {
+	fmt.Println(remote)
+	if strings.HasPrefix(remote, "http") {
+		return getHostFromHTTP(remote)
+	}
+	return getHostFromSSH(remote)
 }
 
 func getHostFromHTTP(remote string) string {
@@ -22,23 +41,7 @@ func getHostFromHTTP(remote string) string {
 }
 
 func getHostFromSSH(remote string) string {
-	splitted := strings.Split(remote, ":")
-	r := strings.TrimRight(splitted[1], "/")
-	return r
-}
-
-func GetHostNameFromRemoteString(remote string) string {
-	if strings.HasPrefix(remote, "http") {
-		return getHostFromHTTP(remote)
-	}
-	return getHostFromSSH(remote)
-}
-
-func GetHost(host string) (Host, error) {
-	for h, builder := range hosts {
-		if h == host {
-			return builder(), nil
-		}
-	}
-	return nil, fmt.Errorf("Not host for %s", host)
+	return strings.FieldsFunc(remote, func(r rune) bool {
+		return r == ':' || r == '@'
+	})[1]
 }
