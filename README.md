@@ -28,18 +28,21 @@ Help Options:
 ```
 
 ```bash
+$> mergo -d dev -b staging --host=gitlab --owner=jfaucherre --repository=mergo
+Enter the pull request's title:
+My awesome pull request
+<Your git configured editor will then open for you to write your pull request's content>
+```
+
+If you don't give the repository informations, mergo will take the informations from the git repository you're in
+
+```bash
 $> mergo
 Enter the pull request's title:
 My awesome pull request
 <Your git configured editor will then open for you to write your pull request's content>
 ```
 
-```bash
-$> mergo -b staging --host=gitlab --owner=jfaucherre --repository=mergo
-Enter the pull request's title:
-My awesome pull request
-<Your git configured editor will then open for you to write your pull request's content>
-```
 ### Personal config
 As I like to keep all things in one place I have run the following command
 ```bash
