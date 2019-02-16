@@ -1,14 +1,23 @@
 package tools
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
 )
 
+const KEY_SIZE = 32
+
 var (
 	configDir = path.Join(os.Getenv("HOME"), ".config", "mergo")
+	keyPath   = path.Join(configDir, ".key")
+	key       []byte
 )
 
 func GetHostConfig(host string) ([]byte, error) {
@@ -16,13 +25,23 @@ func GetHostConfig(host string) ([]byte, error) {
 	s, err := os.Stat(p)
 
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	if s.IsDir() {
-		return []byte{}, fmt.Errorf("%s must not be a directory", p)
+		return nil, fmt.Errorf("%s must not be a directory", p)
 	}
 
-	return ioutil.ReadFile(p)
+	content, err := ioutil.ReadFile(p)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := getEncryptionKey()
+	if err != nil {
+		return nil, err
+	}
+
+	return decrypt(content, key)
 }
 
 func WriteHostConfig(host string, content []byte) error {
@@ -42,5 +61,80 @@ func WriteHostConfig(host string, content []byte) error {
 
 	p := path.Join(configDir, host)
 
-	return ioutil.WriteFile(p, content, 0644)
+	key, err := getEncryptionKey()
+	if err != nil {
+		return err
+	}
+
+	encrypted, err := encrypt(content, key)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(p, encrypted, 0644)
+}
+
+func encrypt(plaintext []byte, key []byte) ([]byte, error) {
+	c, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(c)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+
+	return gcm.Seal(nonce, nonce, plaintext, nil), nil
+}
+
+func decrypt(ciphertext []byte, key []byte) ([]byte, error) {
+	c, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(c)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, errors.New("ciphertext too short")
+	}
+
+	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	return gcm.Open(nil, nonce, ciphertext, nil)
+}
+
+func getEncryptionKey() ([]byte, error) {
+	if key == nil {
+		_, err := os.Stat(keyPath)
+		if err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+		if os.IsNotExist(err) {
+			return createEncryptionKey()
+		}
+		return ioutil.ReadFile(keyPath)
+	}
+	return key, nil
+}
+
+func createEncryptionKey() ([]byte, error) {
+	key = make([]byte, KEY_SIZE, KEY_SIZE)
+	_, err := rand.Read(key)
+
+	err = ioutil.WriteFile(keyPath, key, 0400)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }

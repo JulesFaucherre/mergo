@@ -5,20 +5,17 @@ import (
 	"regexp"
 	"strings"
 
+	"gitlab.com/jfaucherre/mergo/hosts/github"
+	"gitlab.com/jfaucherre/mergo/hosts/gitlab"
 	"gitlab.com/jfaucherre/mergo/models"
 )
 
-var hosts = map[*regexp.Regexp]func() (Host, error){
-	regexp.MustCompile("[http://|https://]?[www.]?github[.com]?"): newGithub,
-	regexp.MustCompile("[http://|https://]?[www.]?gitlab[.com]?"): newGitlab,
+var hosts = map[*regexp.Regexp]func() (models.Host, error){
+	regexp.MustCompile("[http://|https://]?[www.]?github[.com]?"): github.NewGithub,
+	regexp.MustCompile("[http://|https://]?[www.]?gitlab[.com]?"): gitlab.NewGitlab,
 }
 
-type Host interface {
-	SubmitPr(*models.Opts) error
-	GetOwnerAndRepo(string) (string, string)
-}
-
-func GetHost(host string) (Host, error) {
+func GetHost(host string) (models.Host, error) {
 	for h, builder := range hosts {
 		if h.MatchString(host) {
 			return builder()
