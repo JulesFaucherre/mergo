@@ -74,6 +74,10 @@ func WriteHostConfig(host string, content []byte) error {
 	return ioutil.WriteFile(p, encrypted, 0644)
 }
 
+func DeleteHostConfig(host string) error {
+	return os.Remove(path.Join(configDir, host))
+}
+
 func encrypt(plaintext []byte, key []byte) ([]byte, error) {
 	c, err := aes.NewCipher(key)
 	if err != nil {

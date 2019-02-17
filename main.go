@@ -23,6 +23,13 @@ func main() {
 	var host models.Host
 	var remoteString string
 
+	if !tools.IsEmpty(opts.Delete) {
+		if err = tools.DeleteHostConfig(opts.Delete); err != nil {
+			fmt.Println(err)
+		}
+		return
+	}
+
 	if tools.IsEmpty(opts.Host) {
 		remoteString, err = git.
 			LocalRepository().
@@ -54,29 +61,19 @@ func main() {
 		opts.Owner, opts.Repo = host.GetOwnerAndRepo(remoteString)
 	}
 
-	if err = handleMissingPrInformations(opts); err != nil {
-		fmt.Println(err)
-		return
+	if tools.IsEmpty(opts.Head) {
+		if opts.Head, err = git.
+			LocalRepository().
+			Branch().
+			Do(context.Background()); err != nil {
+			fmt.Println(err)
+			return
+		}
+		opts.Head = strings.Trim(opts.Head, "\n")
 	}
 
 	if err = host.SubmitPr(opts); err != nil {
 		fmt.Println(err)
 		return
 	}
-}
-
-func handleMissingPrInformations(opts *models.Opts) error {
-	var err error
-
-	if tools.IsEmpty(opts.Head) {
-		if opts.Head, err = git.
-			LocalRepository().
-			Branch().
-			Do(context.Background()); err != nil {
-			return err
-		}
-		opts.Head = strings.Trim(opts.Head, "\n")
-	}
-
-	return nil
 }
