@@ -8,4 +8,6 @@ type Opts struct {
 	Remote string `long:"remote" description:"The remote to use" default:"origin"`
 	Repo   string `long:"repository" description:"The name of the repository on which you want to make the pull request"`
 	Owner  string `long:"owner" description:"The owner of the repository"`
+
+	Delete string `long:"delete-creds" description:"Use this option when you mergo to delete the credentials it has stored about an host"`
 }
