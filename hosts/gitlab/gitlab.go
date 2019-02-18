@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -99,6 +100,21 @@ func (me gitlab) SubmitPr(opts *models.Opts) error {
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("Request failed with status %s", resp.Status)
 	}
+
+	res := struct {
+		WebURL string `json:"web_url"`
+	}{}
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if err = json.Unmarshal(b, &res); err != nil {
+		return err
+	}
+
+	fmt.Printf("Your pull request is available at the following URL:\n%s", res.WebURL)
 
 	return nil
 }
