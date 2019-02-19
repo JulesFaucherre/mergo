@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	flags "github.com/jessevdk/go-flags"
@@ -13,6 +14,41 @@ import (
 	"gitlab.com/jfaucherre/mergo/tools"
 )
 
+var (
+	httpsR = regexp.MustCompile(`https://(\w+\.\w+)/(\w+)/(\w+).git`)
+	sshR   = regexp.MustCompile(`git@(\w+\.\w+):(\w+)/(\w+).git`)
+)
+
+func getRemoteInformations(opts *models.Opts) error {
+	remoteString, err := git.
+		LocalRepository().
+		Remote(opts.Remote).
+		Do(context.Background())
+	if err != nil {
+		return err
+	}
+
+	matches := httpsR.FindStringSubmatch(remoteString)
+	if len(matches) == 0 {
+		matches = sshR.FindStringSubmatch(remoteString)
+		if len(matches) == 0 {
+			return fmt.Errorf("Unable to extract informations from remote string %s", remoteString)
+		}
+	}
+
+	if tools.IsEmpty(opts.Host) {
+		opts.Host = matches[1]
+	}
+	if tools.IsEmpty(opts.Owner) {
+		opts.Owner = matches[2]
+	}
+	if tools.IsEmpty(opts.Repo) {
+		opts.Repo = matches[3]
+	}
+
+	return nil
+}
+
 func main() {
 	opts := &models.Opts{}
 
@@ -21,7 +57,6 @@ func main() {
 		return
 	}
 	var host models.Host
-	var remoteString string
 
 	if !tools.IsEmpty(opts.Delete) {
 		if err = tools.DeleteHostConfig(opts.Delete); err != nil {
@@ -30,35 +65,13 @@ func main() {
 		return
 	}
 
-	if tools.IsEmpty(opts.Host) {
-		remoteString, err = git.
-			LocalRepository().
-			Remote(opts.Remote).
-			Do(context.Background())
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		opts.Host = hosts.GetHostNameFromRemoteString(remoteString)
+	if tools.IsEmpty(opts.Host) || tools.IsEmpty(opts.Owner) || tools.IsEmpty(opts.Repo) {
+		getRemoteInformations(opts)
 	}
 
 	if host, err = hosts.GetHost(opts.Host); err != nil {
 		fmt.Println(err)
 		return
-	}
-
-	if tools.IsEmpty(opts.Owner) || tools.IsEmpty(opts.Repo) {
-		if tools.IsEmpty(remoteString) {
-			remoteString, err = git.
-				LocalRepository().
-				Remote(opts.Remote).
-				Do(context.Background())
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-		}
-		opts.Owner, opts.Repo = host.GetOwnerAndRepo(remoteString)
 	}
 
 	if tools.IsEmpty(opts.Head) {

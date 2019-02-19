@@ -45,10 +45,6 @@ func NewGitlab() (models.Host, error) {
 	}, nil
 }
 
-func (me gitlab) GetOwnerAndRepo(repository string) (string, string) {
-	return tools.DefaultOwnerAndRepo(repository)
-}
-
 func (me gitlab) SubmitPr(opts *models.Opts) error {
 	var err error
 	body := struct {

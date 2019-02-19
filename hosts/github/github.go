@@ -53,10 +53,6 @@ func NewGithub() (models.Host, error) {
 	return askForCredentials()
 }
 
-func (me github) GetOwnerAndRepo(remote string) (string, string) {
-	return tools.DefaultOwnerAndRepo(remote)
-}
-
 func (me github) SubmitPr(opts *models.Opts) error {
 	var err error
 	body := struct {
