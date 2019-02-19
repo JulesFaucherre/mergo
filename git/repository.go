@@ -33,10 +33,7 @@ func (me *GitCmd) Branch() *GitCmd {
 
 func (me *GitCmd) Remote(remote string) *GitCmd {
 	me.cmd = [][]string{
-		{"git", "remote", "-v"},
-		{"grep", remote},
-		{"awk", "{print $2}"},
-		{"head", "-n", "1"},
+		{"git", "remote", "get-url", remote},
 	}
 	return me
 }
