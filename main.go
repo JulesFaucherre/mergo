@@ -29,9 +29,9 @@ func getRemoteInformations(opts *models.Opts) error {
 	}
 
 	matches := httpsR.FindStringSubmatch(remoteString)
-	if len(matches) == 0 {
+	if matches == nil {
 		matches = sshR.FindStringSubmatch(remoteString)
-		if len(matches) == 0 {
+		if matches == nil {
 			return fmt.Errorf("Unable to extract informations from remote string %s", remoteString)
 		}
 	}

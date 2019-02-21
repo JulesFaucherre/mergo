@@ -32,11 +32,12 @@ func GetEditor(ctx context.Context) (string, error) {
 // Note that lines starting with '#' will be considered as comments
 func EditText(baseContent []byte) (string, error) {
 	ctx := context.Background()
-	editor, err := GetEditor(ctx)
+	rawEditor, err := GetEditor(ctx)
 	if err != nil {
 		return "", err
 	}
-	editor = strings.TrimSpace(editor)
+	rawEditor = strings.TrimSpace(rawEditor)
+	editor := strings.Split(rawEditor, "\n")
 
 	tmpfile, err := ioutil.TempFile("", "mergo-*")
 	if err != nil {
@@ -47,8 +48,9 @@ func EditText(baseContent []byte) (string, error) {
 	if _, err = tmpfile.Write(baseContent); err != nil {
 		return "", err
 	}
+	editor = append(editor, tmpfile.Name())
 
-	cmd := exec.CommandContext(ctx, editor, tmpfile.Name())
+	cmd := exec.CommandContext(ctx, editor[0], editor[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
