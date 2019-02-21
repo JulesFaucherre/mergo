@@ -53,3 +53,11 @@ So that I can then run
 git pr
 ```
 just after I have pushed code on my repository
+
+### Support
+
+Mergo actually support:
+- github
+- gitlab
+
+Do not hesitate to propose pull request to support more git client
