@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// GetEditor gives the editor configured by the user as a raw command string
 func GetEditor(ctx context.Context) (string, error) {
 	cmd := [][]string{
 		{"git", "config", "--global", "--get", "core.editor"},
@@ -26,6 +27,9 @@ func GetEditor(ctx context.Context) (string, error) {
 	return "vi", nil
 }
 
+// EditText launches the user's configured editor and returns the text it has
+// written in
+// Note that lines starting with '#' will be considered as comments
 func EditText(baseContent []byte) (string, error) {
 	ctx := context.Background()
 	editor, err := GetEditor(ctx)

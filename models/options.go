@@ -1,5 +1,6 @@
 package models
 
+// Opts represents the options passed from command line
 type Opts struct {
 	Head string `short:"d" long:"head" description:"The head branch you want to merge into the base"`
 	Base string `short:"b" long:"base" description:"The base branch you want to merge into" default:"master"`

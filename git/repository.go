@@ -22,6 +22,7 @@ func LocalRepository() *GitCmd {
 	return Repository(pwd)
 }
 
+// Returns a GitCmd to get the active branch of the repository
 func (me *GitCmd) Branch() *GitCmd {
 	me.cmd = [][]string{
 		{"git", "branch"},
@@ -31,6 +32,7 @@ func (me *GitCmd) Branch() *GitCmd {
 	return me
 }
 
+// Returns the git url for the remote 'remote'
 func (me *GitCmd) Remote(remote string) *GitCmd {
 	me.cmd = [][]string{
 		{"git", "remote", "get-url", remote},
@@ -59,6 +61,7 @@ func getGitPath(repoPath string) (string, error) {
 	return getGitPath(path.Join(repoPath, ".."))
 }
 
+// Do runs the GitCmd with the context ctx and returns its result
 func (me *GitCmd) Do(ctx context.Context) (string, error) {
 	if me.p == "" || me.cmd == nil {
 		return "", fmt.Errorf("Can not launch any command, repository was not initiated well")
