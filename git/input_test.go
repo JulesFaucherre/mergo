@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -9,11 +10,15 @@ import (
 )
 
 func TestGetEditor(t *testing.T) {
-	v, err := Repository(testRepo).
+	exec.Command("git", "config", "core.editor", "nano").Run()
+
+	v, err := LocalRepository().
 		GetEditor().
 		Do(context.Background())
 	v = strings.TrimSpace(v)
 
 	assert.Equal(t, "nano", v)
-	assert.Equal(t, nil, err)
+	assert.Nil(t, nil, err)
+
+	exec.Command("git", "config", "--unset", "core.editor").Run()
 }

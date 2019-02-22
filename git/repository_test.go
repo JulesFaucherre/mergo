@@ -2,32 +2,48 @@ package git
 
 import (
 	"context"
-	"os"
-	"path"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	pwd, _   = os.Getwd()
-	testRepo = path.Join(pwd, "..", "tests")
-)
-
 func TestBranch(t *testing.T) {
-	v, err := Repository(testRepo).
+	old, _ := LocalRepository().
 		Branch().
 		Do(context.Background())
+	old = strings.TrimSpace(old)
 
-	assert.Equal(t, v, "test\n")
-	assert.Equal(t, err, nil)
+	branch := "go-test-branch"
+
+	exec.Command("git", "checkout", "-b", branch).Run()
+
+	v, err := LocalRepository().
+		Branch().
+		Do(context.Background())
+	v = strings.TrimSpace(v)
+
+	assert.Equal(t, branch, v)
+	assert.Nil(t, err)
+
+	exec.Command("git", "checkout", old).Run()
+	exec.Command("git", "branch", "-D", branch).Run()
 }
 
 func TestRemote(t *testing.T) {
-	v, err := Repository(testRepo).
-		Remote("origin").
-		Do(context.Background())
+	key := "test"
+	value := "git@gitlab.com:jfaucherre/mergo.git"
 
-	assert.Equal(t, v, "git@gitlab.com:jfaucherre/mergo.git\n")
-	assert.Equal(t, err, nil)
+	exec.Command("git", "remote", "add", key, value).Run()
+
+	v, err := LocalRepository().
+		Remote(key).
+		Do(context.Background())
+	v = strings.TrimSpace(v)
+
+	assert.Equal(t, v, value)
+	assert.Nil(t, err)
+
+	exec.Command("git", "remote", "remove", key).Run()
 }
