@@ -50,6 +50,7 @@ func (me *Repo) Remote(remote string) *GitCmd {
 type GitCmd struct {
 	repo *Repo
 	cmd  [][]string
+	next func(string, error) (string, error)
 }
 
 // Do runs the GitCmd with the context ctx and returns its result
@@ -71,7 +72,11 @@ func (me *GitCmd) Do(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	res, err := run(ctx, me.cmd)
+	if me.next == nil {
+		me.next = func(a string, e error) (string, error) { return a, e }
+	}
+
+	res, err := me.next(run(ctx, me.cmd))
 	if err != nil {
 		return "", err
 	}

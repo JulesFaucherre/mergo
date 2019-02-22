@@ -6,25 +6,34 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"gitlab.com/jfaucherre/mergo/tools"
 )
 
-// GetEditor gives the editor configured by the user as a raw command string
-func GetEditor(ctx context.Context) (string, error) {
-	cmd := [][]string{
-		{"git", "config", "--global", "--get", "core.editor"},
-	}
-	if editor, _ := run(ctx, cmd); editor != "" {
-		return editor, nil
+// GetEditor returns the GitCmd to get the user's git editor
+func (me *Repo) GetEditor() *GitCmd {
+	next := func(editor string, err error) (string, error) {
+		if !tools.IsEmpty(editor) {
+			return editor, nil
+		}
+
+		if editor := os.Getenv("EDITOR"); editor != "" {
+			return editor, nil
+		}
+		if editor := os.Getenv("VISUAL"); editor != "" {
+			return editor, nil
+		}
+
+		return "vi", nil
 	}
 
-	if editor := os.Getenv("EDITOR"); editor != "" {
-		return editor, nil
+	return &GitCmd{
+		repo: me,
+		cmd: [][]string{
+			{"git", "config", "--get", "core.editor"},
+		},
+		next: next,
 	}
-	if editor := os.Getenv("VISUAL"); editor != "" {
-		return editor, nil
-	}
-
-	return "vi", nil
 }
 
 // EditText launches the user's configured editor and returns the text it has
@@ -32,7 +41,7 @@ func GetEditor(ctx context.Context) (string, error) {
 // Note that lines starting with '#' will be considered as comments
 func EditText(baseContent []byte) (string, error) {
 	ctx := context.Background()
-	rawEditor, err := GetEditor(ctx)
+	rawEditor, err := LocalRepository().GetEditor().Do(ctx)
 	if err != nil {
 		return "", err
 	}
