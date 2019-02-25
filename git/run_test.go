@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,8 @@ func TestMany(t *testing.T) {
 		{"grep", "run"},
 		{"wc", "-l"},
 	})
+	c = strings.TrimSpace(c)
 
 	assert.Equal(t, nil, err)
-	assert.Equal(t, "       2\n", c)
+	assert.Equal(t, "2", c)
 }
