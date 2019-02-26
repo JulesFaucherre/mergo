@@ -12,3 +12,5 @@
 *.out
 
 mergo
+
+vendor

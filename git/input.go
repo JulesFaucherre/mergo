@@ -6,33 +6,47 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"gitlab.com/jfaucherre/mergo/tools"
 )
 
-func GetEditor(ctx context.Context) (string, error) {
-	cmd := [][]string{
-		{"git", "config", "--global", "--get", "core.editor"},
-	}
-	if editor, _ := run(ctx, cmd); editor != "" {
-		return editor, nil
+// GetEditor returns the GitCmd to get the user's git editor
+func (me *Repo) GetEditor() *GitCmd {
+	next := func(editor string, err error) (string, error) {
+		if !tools.IsEmpty(editor) {
+			return editor, nil
+		}
+
+		if editor := os.Getenv("EDITOR"); editor != "" {
+			return editor, nil
+		}
+		if editor := os.Getenv("VISUAL"); editor != "" {
+			return editor, nil
+		}
+
+		return "vi", nil
 	}
 
-	if editor := os.Getenv("EDITOR"); editor != "" {
-		return editor, nil
+	return &GitCmd{
+		repo: me,
+		cmd: [][]string{
+			{"git", "config", "--get", "core.editor"},
+		},
+		next: next,
 	}
-	if editor := os.Getenv("VISUAL"); editor != "" {
-		return editor, nil
-	}
-
-	return "vi", nil
 }
 
+// EditText launches the user's configured editor and returns the text it has
+// written in
+// Note that lines starting with '#' will be considered as comments
 func EditText(baseContent []byte) (string, error) {
 	ctx := context.Background()
-	editor, err := GetEditor(ctx)
+	rawEditor, err := LocalRepository().GetEditor().Do(ctx)
 	if err != nil {
 		return "", err
 	}
-	editor = strings.TrimSpace(editor)
+	rawEditor = strings.TrimSpace(rawEditor)
+	editor := strings.Split(rawEditor, "\n")
 
 	tmpfile, err := ioutil.TempFile("", "mergo-*")
 	if err != nil {
@@ -43,8 +57,9 @@ func EditText(baseContent []byte) (string, error) {
 	if _, err = tmpfile.Write(baseContent); err != nil {
 		return "", err
 	}
+	editor = append(editor, tmpfile.Name())
 
-	cmd := exec.CommandContext(ctx, editor, tmpfile.Name())
+	cmd := exec.CommandContext(ctx, editor[0], editor[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr

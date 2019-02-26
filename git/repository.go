@@ -6,36 +6,86 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+
+	"gitlab.com/jfaucherre/mergo/tools"
 )
 
-type GitCmd struct {
-	p   string
-	cmd [][]string
+type Repo struct {
+	p string
 }
 
-func Repository(repoPath string) *GitCmd {
-	return &GitCmd{p: repoPath}
+// Repository returns the used repository at path 'repoPath'
+func Repository(repoPath string) *Repo {
+	return &Repo{p: repoPath}
 }
 
-func LocalRepository() *GitCmd {
+// LocalRepository returns the used repository at pwd
+func LocalRepository() *Repo {
 	pwd, _ := os.Getwd()
 	return Repository(pwd)
 }
 
-func (me *GitCmd) Branch() *GitCmd {
-	me.cmd = [][]string{
-		{"git", "branch"},
-		{"grep", "*"},
-		{"awk", "{print $2}"},
+// Branch returns a GitCmd to get the active branch of the repository
+func (me *Repo) Branch() *GitCmd {
+	return &GitCmd{
+		repo: me,
+		cmd: [][]string{
+			{"git", "branch"},
+			{"grep", "*"},
+			{"awk", "{print $2}"},
+		},
 	}
-	return me
 }
 
-func (me *GitCmd) Remote(remote string) *GitCmd {
-	me.cmd = [][]string{
-		{"git", "remote", "get-url", remote},
+// Remote returns the git url for the remote 'remote'
+func (me *Repo) Remote(remote string) *GitCmd {
+	return &GitCmd{
+		repo: me,
+		cmd: [][]string{
+			{"git", "remote", "get-url", remote},
+		},
 	}
-	return me
+}
+
+type GitCmd struct {
+	repo *Repo
+	cmd  [][]string
+	next func(string, error) (string, error)
+}
+
+// Do runs the GitCmd with the context ctx and returns its result
+func (me *GitCmd) Do(ctx context.Context) (string, error) {
+	if tools.IsEmpty(me.repo.p) || me.cmd == nil {
+		return "", fmt.Errorf("Can not launch any command, repository was not initiated well")
+	}
+	repoPath, err := getGitPath(me.repo.p)
+	if err != nil {
+		return "", err
+	}
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	if err = os.Chdir(repoPath); err != nil {
+		return "", err
+	}
+
+	if me.next == nil {
+		me.next = func(a string, e error) (string, error) { return a, e }
+	}
+
+	res, err := me.next(run(ctx, me.cmd))
+	if err != nil {
+		return "", err
+	}
+
+	if err = os.Chdir(pwd); err != nil {
+		return "", err
+	}
+
+	return res, nil
 }
 
 func getGitPath(repoPath string) (string, error) {
@@ -57,18 +107,4 @@ func getGitPath(repoPath string) (string, error) {
 	}
 
 	return getGitPath(path.Join(repoPath, ".."))
-}
-
-func (me *GitCmd) Do(ctx context.Context) (string, error) {
-	if me.p == "" || me.cmd == nil {
-		return "", fmt.Errorf("Can not launch any command, repository was not initiated well")
-	}
-	_, err := getGitPath(me.p)
-	if err != nil {
-		return "", err
-	}
-
-	res, err := run(ctx, me.cmd)
-
-	return res, err
 }

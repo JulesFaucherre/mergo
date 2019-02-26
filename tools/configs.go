@@ -1,3 +1,7 @@
+// The package tools provides utilities for mergo
+// The main utility you will find is to save, get and delete user's credentials
+// You should use these functions when managing user's credentials since they
+// come with their way of handling encryption
 package tools
 
 import (
@@ -12,7 +16,7 @@ import (
 	"path"
 )
 
-const KEY_SIZE = 32
+const keySize = 32
 
 var (
 	configDir = path.Join(os.Getenv("HOME"), ".config", "mergo")
@@ -20,6 +24,7 @@ var (
 	key       []byte
 )
 
+// GetHostConfig returns the config stored for the host 'host'
 func GetHostConfig(host string) ([]byte, error) {
 	p := path.Join(configDir, host)
 	s, err := os.Stat(p)
@@ -44,6 +49,7 @@ func GetHostConfig(host string) ([]byte, error) {
 	return decrypt(content, key)
 }
 
+// WriteHostConfig writes the config 'content' for the host 'host'
 func WriteHostConfig(host string, content []byte) error {
 	s, err := os.Stat(configDir)
 
@@ -74,6 +80,7 @@ func WriteHostConfig(host string, content []byte) error {
 	return ioutil.WriteFile(p, encrypted, 0644)
 }
 
+// DeleteHostConfig deletes the config for host 'host'
 func DeleteHostConfig(host string) error {
 	return os.Remove(path.Join(configDir, host))
 }
@@ -132,7 +139,7 @@ func getEncryptionKey() ([]byte, error) {
 }
 
 func createEncryptionKey() ([]byte, error) {
-	key = make([]byte, KEY_SIZE, KEY_SIZE)
+	key = make([]byte, keySize, keySize)
 	_, err := rand.Read(key)
 
 	err = ioutil.WriteFile(keyPath, key, 0400)
