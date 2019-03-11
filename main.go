@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	httpsR = regexp.MustCompile(`https://(\w+\.\w+)/(\w+)/(\w+).git`)
-	sshR   = regexp.MustCompile(`git@(\w+\.\w+):(\w+)/(\w+).git`)
+	httpsR = regexp.MustCompile(`https://(\w+\.\w+)/([\w-]+)/([\w-]+).git`)
+	sshR   = regexp.MustCompile(`git@(\w+\.\w+):([\w-]+)/([\w-]+).git`)
 )
 
 func getRemoteInformations(opts *models.Opts) error {
