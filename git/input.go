@@ -38,24 +38,23 @@ func (me *Repo) GetEditor() *GitCmd {
 
 // EditText launches the user's configured editor and returns the text it has
 // written in
-// Note that lines starting with '#' will be considered as comments
-func EditText(baseContent []byte) (string, error) {
+func EditText(baseContent []byte) ([]byte, error) {
 	ctx := context.Background()
 	rawEditor, err := LocalRepository().GetEditor().Do(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	rawEditor = strings.TrimSpace(rawEditor)
 	editor := strings.Split(rawEditor, "\n")
 
 	tmpfile, err := ioutil.TempFile("", "mergo-*")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer os.Remove(tmpfile.Name())
 
 	if _, err = tmpfile.Write(baseContent); err != nil {
-		return "", err
+		return nil, err
 	}
 	editor = append(editor, tmpfile.Name())
 
@@ -64,30 +63,13 @@ func EditText(baseContent []byte) (string, error) {
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 	if err = cmd.Run(); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var content []byte
 	if content, err = ioutil.ReadFile(tmpfile.Name()); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	res := removeComments(string(content))
-
-	if err = tmpfile.Close(); err != nil {
-		return "", err
-	}
-
-	return res, nil
-}
-
-func removeComments(src string) string {
-	dst := make([]string, 0)
-
-	for _, s := range strings.Split(src, "\n") {
-		if !strings.HasPrefix(strings.TrimSpace(s), "#") {
-			dst = append(dst, s)
-		}
-	}
-	return strings.Join(dst, "\r\n")
+	return content, nil
 }

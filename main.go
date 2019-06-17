@@ -85,6 +85,13 @@ func main() {
 		opts.Head = strings.Trim(opts.Head, "\n")
 	}
 
+	commits, err := git.LocalRepository().GetDifferenceCommits(opts.Head, opts.Base)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	opts.Commits = commits
+
 	if err = host.SubmitPr(opts); err != nil {
 		fmt.Println(err)
 		return

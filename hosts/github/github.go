@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"gitlab.com/jfaucherre/mergo/git"
+	hostTools "gitlab.com/jfaucherre/mergo/hosts/tools"
 	"gitlab.com/jfaucherre/mergo/models"
 	"gitlab.com/jfaucherre/mergo/tools"
 )
@@ -26,7 +26,6 @@ var (
 	usernameRegex = regexp.MustCompile(".*")
 	baseContent   = []byte(`# Enter the content of your pull request
 # Every line starting with a '#' will be considered as a comment and not treated
-
 `)
 )
 
@@ -65,16 +64,12 @@ func (me github) SubmitPr(opts *models.Opts) error {
 		Base: opts.Base,
 	}
 
-	stdin := bufio.NewReader(os.Stdin)
-	fmt.Println("Enter the pull request's title:")
-	if body.Title, err = stdin.ReadString('\n'); err != nil {
+	userInfo, err := hostTools.DefaultGetUserInfo(opts)
+	if err != nil {
 		return err
 	}
-	body.Title = strings.Trim(body.Title, "\n")
 
-	if body.Body, err = git.EditText(baseContent); err != nil {
-		return err
-	}
+	body.Title, body.Body = userInfo.Title, userInfo.Body
 
 	url := fmt.Sprintf(
 		"https://%s:%s@api.github.com/repos/%s/%s/pulls",
