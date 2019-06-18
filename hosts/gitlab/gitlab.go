@@ -10,21 +10,13 @@ import (
 	"os"
 	"strings"
 
-	"gitlab.com/jfaucherre/mergo/git"
+	hostTools "gitlab.com/jfaucherre/mergo/hosts/tools"
 	"gitlab.com/jfaucherre/mergo/models"
 	"gitlab.com/jfaucherre/mergo/tools"
 )
 
 const (
 	glPersonalAccessTokenURL = "https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html#creating-a-personal-access-token"
-)
-
-var (
-	baseContent = []byte(`# Enter the content of your pull request
-# Every line starting with a '#' will be considered as a comment and not treated
-# Please note that new lines in gitlab's descriptions are <br />
-
-`)
 )
 
 type gitlab struct {
@@ -57,22 +49,18 @@ func (me gitlab) SubmitPr(opts *models.Opts) error {
 		TargetBranch: opts.Base,
 	}
 
-	stdin := bufio.NewReader(os.Stdin)
-	fmt.Println("Enter the pull request's title:")
-	if body.Title, err = stdin.ReadString('\n'); err != nil {
-		return err
-	}
-	body.Title = strings.Trim(body.Title, "\n")
-
-	if body.Description, err = git.EditText(baseContent); err != nil {
-		return err
-	}
-
 	url := fmt.Sprintf(
 		"https://gitlab.com/api/v4/projects/%s%%2f%s/merge_requests",
 		opts.Owner,
 		opts.Repo,
 	)
+
+	userInfo, err := hostTools.DefaultGetUserInfo(opts)
+	if err != nil {
+		return err
+	}
+	body.Title = userInfo.Title
+	body.Description = userInfo.Body
 
 	marshaled, err := json.Marshal(body)
 	if err != nil {

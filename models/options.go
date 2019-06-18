@@ -1,5 +1,7 @@
 package models
 
+import "gitlab.com/jfaucherre/mergo/git"
+
 // Opts represents the options passed from command line
 type Opts struct {
 	Head string `short:"d" long:"head" description:"The head branch you want to merge into the base"`
@@ -11,4 +13,6 @@ type Opts struct {
 	Owner  string `long:"owner" description:"The owner of the repository"`
 
 	Delete string `long:"delete-creds" description:"Use this option when you mergo to delete the credentials it has stored about an host"`
+
+	Commits []*git.Commit
 }
