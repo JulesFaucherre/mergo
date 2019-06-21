@@ -1,21 +1,33 @@
 package models
 
-import "gitlab.com/jfaucherre/mergo/git"
+type Options struct {
+	Verbose []bool `short:"v" long:"verbose" description:"The level of verbosity you want"`
+}
 
-// Opts represents the options passed from command line
-type Opts struct {
+type ConfigOptions struct {
+	Get        []string          `long:"get" description:"Gets a variable"`
+	Set        map[string]string `long:"set" description:"Add a new variable like key:value"`
+	Unset      []string          `long:"unset" description:"Unsets a variable"`
+	DeleteCred []string          `long:"delete-credential" description:"Deletes the authentification credentials for the specified host"`
+	Global     bool              `short:"g" long:"global" description:"Use global config file"`
+}
+
+type MergeOptions struct {
 	Head string `short:"d" long:"head" description:"The head branch you want to merge into the base"`
-	Base string `short:"b" long:"base" description:"The base branch you want to merge into" default:"master"`
+	Base string `short:"b" long:"base" description:"The base branch you want to merge into"`
 	Host string `long:"host" description:"The git host you use, ie github, gitlab, etc."`
 
-	Remote    string `long:"remote" description:"The remote to use" default:"origin"`
+	Remote    string `long:"remote" description:"The remote to use"`
 	Repo      string `long:"repository" description:"The name of the repository on which you want to make the pull request"`
 	Owner     string `long:"owner" description:"The owner of the repository"`
 	Clipboard bool   `long:"copy-clipboard" description:"Copies the merge request adress to the clipboard"`
-
-	Verbose bool `short:"v" long:"verbose" description:"Whether you want to have logs on whaat is happening"`
-
-	Delete string `long:"delete-creds" description:"Use this option when you mergo to delete the credentials it has stored about an host"`
-
-	Commits []*git.Commit
 }
+
+var (
+	options       = &Options{Verbose: []bool{}}
+	configOptions = &ConfigOptions{}
+	mergeOptions  = &MergeOptions{
+		Base:   "master",
+		Remote: "origin",
+	}
+)
