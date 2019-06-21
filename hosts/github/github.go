@@ -52,7 +52,7 @@ func NewGithub() (models.Host, error) {
 	return askForCredentials()
 }
 
-func (me github) SubmitPr(opts *models.Opts) error {
+func (me github) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
 	var err error
 	body := struct {
 		Head  string `json:"head"`
@@ -66,7 +66,7 @@ func (me github) SubmitPr(opts *models.Opts) error {
 
 	userInfo, err := hostTools.DefaultGetUserInfo(opts)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	body.Title, body.Body = userInfo.Title, userInfo.Body
@@ -81,15 +81,15 @@ func (me github) SubmitPr(opts *models.Opts) error {
 
 	marshaled, err := json.Marshal(body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	reader := bytes.NewReader(marshaled)
 	resp, err := http.Post(url, "application/json", reader)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("Request failed with status %s", resp.Status)
+		return nil, fmt.Errorf("Request failed with status %s", resp.Status)
 	}
 
 	res := struct {
@@ -98,16 +98,16 @@ func (me github) SubmitPr(opts *models.Opts) error {
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err = json.Unmarshal(b, &res); err != nil {
-		return err
+		return nil, err
 	}
 
-	fmt.Printf("Your pull request is available at the following URL:\n%s", res.HTMLURL)
-
-	return nil
+	return &models.MRInfo{
+		URL: res.HTMLURL,
+	}, nil
 }
 
 func askForCredentials() (models.Host, error) {

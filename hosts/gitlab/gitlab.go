@@ -37,7 +37,7 @@ func NewGitlab() (models.Host, error) {
 	}, nil
 }
 
-func (me gitlab) SubmitPr(opts *models.Opts) error {
+func (me gitlab) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
 	var err error
 	body := struct {
 		SourceBranch string `json:"source_branch"`
@@ -57,21 +57,21 @@ func (me gitlab) SubmitPr(opts *models.Opts) error {
 
 	userInfo, err := hostTools.DefaultGetUserInfo(opts)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	body.Title = userInfo.Title
 	body.Description = userInfo.Body
 
 	marshaled, err := json.Marshal(body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	reader := bytes.NewReader(marshaled)
 
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", url, reader)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
@@ -79,10 +79,10 @@ func (me gitlab) SubmitPr(opts *models.Opts) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("Request failed with status %s", resp.Status)
+		return nil, fmt.Errorf("Request failed with status %s", resp.Status)
 	}
 
 	res := struct {
@@ -91,16 +91,16 @@ func (me gitlab) SubmitPr(opts *models.Opts) error {
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err = json.Unmarshal(b, &res); err != nil {
-		return err
+		return nil, err
 	}
 
-	fmt.Printf("Your pull request is available at the following URL:\n%s", res.WebURL)
-
-	return nil
+	return &models.MRInfo{
+		URL: res.WebURL,
+	}, nil
 }
 
 func askForGlCredentials() (models.Host, error) {

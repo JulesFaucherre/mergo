@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/atotto/clipboard"
 	flags "github.com/jessevdk/go-flags"
 	"gitlab.com/jfaucherre/mergo/git"
 	"gitlab.com/jfaucherre/mergo/hosts"
@@ -104,8 +105,14 @@ func main() {
 			return
 		}
 	}
-	if err = host.SubmitPr(opts); err != nil {
+
+	var mrInfo *models.MRInfo
+	if mrInfo, err = host.SubmitPr(opts); err != nil {
 		fmt.Println(err)
 		return
 	}
+	if opts.Clipboard {
+		clipboard.WriteAll(mrInfo.URL)
+	}
+	fmt.Printf("Your request is available at the following URL:\n%s", mrInfo.URL)
 }
