@@ -12,6 +12,8 @@ type Opts struct {
 	Repo   string `long:"repository" description:"The name of the repository on which you want to make the pull request"`
 	Owner  string `long:"owner" description:"The owner of the repository"`
 
+	Verbose bool `short:"v" long:"verbose" description:"Whether you want to have logs on whaat is happening"`
+
 	Delete string `long:"delete-creds" description:"Use this option when you mergo to delete the credentials it has stored about an host"`
 
 	Commits []*git.Commit
