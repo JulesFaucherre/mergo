@@ -8,9 +8,10 @@ type Opts struct {
 	Base string `short:"b" long:"base" description:"The base branch you want to merge into" default:"master"`
 	Host string `long:"host" description:"The git host you use, ie github, gitlab, etc."`
 
-	Remote string `long:"remote" description:"The remote to use" default:"origin"`
-	Repo   string `long:"repository" description:"The name of the repository on which you want to make the pull request"`
-	Owner  string `long:"owner" description:"The owner of the repository"`
+	Remote    string `long:"remote" description:"The remote to use" default:"origin"`
+	Repo      string `long:"repository" description:"The name of the repository on which you want to make the pull request"`
+	Owner     string `long:"owner" description:"The owner of the repository"`
+	Clipboard bool   `long:"copy-clipboard" description:"Copies the merge request adress to the clipboard"`
 
 	Verbose bool `short:"v" long:"verbose" description:"Whether you want to have logs on whaat is happening"`
 
