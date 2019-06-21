@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"gitlab.com/jfaucherre/mergo/tools"
 )
 
 type Commit struct {
@@ -18,6 +20,9 @@ type Commit struct {
 // This function parses commit formatted from the command
 // `git log --date=iso`
 func parseOneCommit(content []string) (*Commit, error) {
+	if tools.Verbose {
+		fmt.Printf("Parsing commit :\n%s\n", strings.Join(content, "\n"))
+	}
 	commit := Commit{}
 	var sp []string
 	var err error
@@ -106,6 +111,10 @@ func (me *Repo) GetDifferenceCommitsWithContext(ctx context.Context, head, base 
 	r, err := cmd.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("While running command : %s\nError : \n%+v", strings.Join(cmd.cmd[0], " "), err)
+	}
+	commits, err := parseCommitList(r)
+	if tools.Verbose && err == nil {
+		fmt.Printf("All commits between %s and %s :\n%+v\n", base, head, commits)
 	}
 	return parseCommitList(r)
 }

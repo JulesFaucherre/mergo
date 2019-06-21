@@ -2,6 +2,10 @@ package tools
 
 import "strings"
 
+var (
+	Verbose = false
+)
+
 func IsEmpty(s string) bool {
 	return len(s) == 0
 }

@@ -56,6 +56,10 @@ func main() {
 	if err != nil {
 		return
 	}
+	tools.Verbose = opts.Verbose
+	if tools.Verbose {
+		fmt.Printf("opts = %+v\n", opts)
+	}
 	var host models.Host
 
 	if !tools.IsEmpty(opts.Delete) {
@@ -92,6 +96,14 @@ func main() {
 	}
 	opts.Commits = commits
 
+	if tools.Verbose {
+		if ok, err := tools.AskYesNo("Do you still want to submit the pr ?"); err != nil {
+			fmt.Println(err)
+			return
+		} else if !ok {
+			return
+		}
+	}
 	if err = host.SubmitPr(opts); err != nil {
 		fmt.Println(err)
 		return
