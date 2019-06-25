@@ -1,118 +1,82 @@
 package main
 
 import (
-	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
-	"regexp"
-	"strings"
+	"path"
 
-	"github.com/atotto/clipboard"
+	"github.com/BurntSushi/toml"
 	flags "github.com/jessevdk/go-flags"
 	"gitlab.com/jfaucherre/mergo/git"
-	"gitlab.com/jfaucherre/mergo/hosts"
-	"gitlab.com/jfaucherre/mergo/models"
-	"gitlab.com/jfaucherre/mergo/tools"
 )
+
+type Options struct {
+	Verbose bool `short:"v" long:"verbose" description:"The level of verbosity you want"`
+}
 
 var (
-	httpsR = regexp.MustCompile(`https://(\w+\.\w+)/([\w-]+)/([\w-]+).git`)
-	sshR   = regexp.MustCompile(`git@(\w+\.\w+):([\w-]+)/([\w-]+).git`)
+	VOptions = &Options{Verbose: false}
 )
 
-func getRemoteInformations(opts *models.Opts) error {
-	remoteString, err := git.
-		LocalRepository().
-		Remote(opts.Remote).
-		Do(context.Background())
+var parser = flags.NewParser(VOptions, flags.Default)
+
+func addConfig(p string) error {
+	f, err := os.Open(p)
+	if os.IsNotExist(err) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 
-	matches := httpsR.FindStringSubmatch(remoteString)
-	if matches == nil {
-		matches = sshR.FindStringSubmatch(remoteString)
-		if matches == nil {
-			return fmt.Errorf("Unable to extract informations from remote string %s", remoteString)
-		}
+	content, err := ioutil.ReadAll(f)
+	if err != nil {
+		return err
 	}
 
-	if tools.IsEmpty(opts.Host) {
-		opts.Host = matches[1]
+	_, err = toml.Decode(string(content), VOptions)
+	if err != nil {
+		return err
 	}
-	if tools.IsEmpty(opts.Owner) {
-		opts.Owner = matches[2]
-	}
-	if tools.IsEmpty(opts.Repo) {
-		opts.Repo = matches[3]
+
+	_, err = toml.Decode(string(content), VCreateOptions)
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
+func parseConfig() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("Unable to find home dir : %+v", err)
+	}
+
+	globalConfigPath := path.Join(home, ".config", "mergo", "config")
+
+	localConfigPath := path.Join(git.LocalRepository().GetPath(), ".git", "mergo.toml")
+
+	for _, p := range []string{globalConfigPath, localConfigPath} {
+		err := addConfig(p)
+		if err != nil {
+			return fmt.Errorf("While trying to read config file : %s got error : %+v", p, err)
+		}
+	}
+	return nil
+}
+
 func main() {
-	opts := &models.Opts{}
-
-	_, err := flags.ParseArgs(opts, os.Args)
-	if err != nil {
-		return
-	}
-	tools.Verbose = opts.Verbose
-	if tools.Verbose {
-		fmt.Printf("opts = %+v\n", opts)
-	}
-	var host models.Host
-
-	if !tools.IsEmpty(opts.Delete) {
-		if err = tools.DeleteHostConfig(opts.Delete); err != nil {
-			fmt.Println(err)
-		}
-		return
-	}
-
-	if tools.IsEmpty(opts.Host) || tools.IsEmpty(opts.Owner) || tools.IsEmpty(opts.Repo) {
-		getRemoteInformations(opts)
-	}
-
-	if host, err = hosts.GetHost(opts.Host); err != nil {
+	if err := parseConfig(); err != nil {
 		fmt.Println(err)
-		return
+		os.Exit(1)
 	}
-
-	if tools.IsEmpty(opts.Head) {
-		if opts.Head, err = git.
-			LocalRepository().
-			Branch().
-			Do(context.Background()); err != nil {
-			fmt.Println(err)
-			return
-		}
-		opts.Head = strings.Trim(opts.Head, "\n")
-	}
-
-	commits, err := git.LocalRepository().GetDifferenceCommits(opts.Head, opts.Base)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	opts.Commits = commits
-
-	if tools.Verbose {
-		if ok, err := tools.AskYesNo("Do you still want to submit the pr ?"); err != nil {
-			fmt.Println(err)
-			return
-		} else if !ok {
-			return
+	if _, err := parser.Parse(); err != nil {
+		if flagsErr, ok := err.(*flags.Error); ok && flagsErr.Type == flags.ErrHelp {
+			os.Exit(0)
+		} else {
+			os.Exit(1)
 		}
 	}
-
-	var mrInfo *models.MRInfo
-	if mrInfo, err = host.SubmitPr(opts); err != nil {
-		fmt.Println(err)
-		return
-	}
-	if opts.Clipboard {
-		clipboard.WriteAll(mrInfo.URL)
-	}
-	fmt.Printf("Your request is available at the following URL:\n%s", mrInfo.URL)
 }
