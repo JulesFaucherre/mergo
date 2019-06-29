@@ -52,7 +52,7 @@ func NewGithub() (models.Host, error) {
 	return askForCredentials()
 }
 
-func (me github) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
+func (me github) SubmitPr(opts models.PrContent) (*models.MRInfo, error) {
 	var err error
 	body := struct {
 		Head  string `json:"head"`
@@ -60,8 +60,8 @@ func (me github) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
 		Title string `json:"title"`
 		Body  string `json:"body"`
 	}{
-		Head: opts.Head,
-		Base: opts.Base,
+		Head: opts.GetHead(),
+		Base: opts.GetBase(),
 	}
 
 	userInfo, err := hostTools.DefaultGetUserInfo(opts)
@@ -75,8 +75,8 @@ func (me github) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
 		"https://%s:%s@api.github.com/repos/%s/%s/pulls",
 		me.user,
 		me.token,
-		opts.Owner,
-		opts.Repo,
+		opts.GetOwner(),
+		opts.GetRepoName(),
 	)
 
 	marshaled, err := json.Marshal(body)

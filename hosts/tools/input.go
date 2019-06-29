@@ -82,9 +82,12 @@ func parseContent(content []byte) (string, string) {
 	return strings.Join(titleC, "\n"), strings.Join(bodyC, "\n")
 }
 
-func DefaultGetUserInfo(opts *models.Opts) (*UserInfo, error) {
+func DefaultGetUserInfo(opts models.PrContent) (*UserInfo, error) {
 	userInfo := &UserInfo{}
-	userInfo.Title, userInfo.Body = defaultValues(opts.Commits)
+	commits, _ := opts.
+		GetRepository().
+		GetDifferenceCommits(opts.GetHead(), opts.GetBase())
+	userInfo.Title, userInfo.Body = defaultValues(commits)
 	templ := template.Must(template.New("User info").Parse(baseContent))
 
 	var tpl bytes.Buffer

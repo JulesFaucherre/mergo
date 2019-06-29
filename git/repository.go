@@ -47,6 +47,10 @@ func (me *Repo) Remote(remote string) *GitCmd {
 	}
 }
 
+func (me *Repo) GetPath() string {
+	return me.p
+}
+
 type GitCmd struct {
 	repo *Repo
 	cmd  [][]string

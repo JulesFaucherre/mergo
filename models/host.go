@@ -1,10 +1,23 @@
 package models
 
-type MRInfo struct {
-	URL string
+import "gitlab.com/jfaucherre/mergo/git"
+
+type PrContent interface {
+	GetHead() string
+	GetBase() string
+	GetHost() string
+
+	GetRepository() *git.Repo
+	GetRemote() string
+	GetRepoName() string
+	GetOwner() string
+	GetClipboard() bool
 }
 
-// Host is the interface for hosts to be used
 type Host interface {
-	SubmitPr(*Opts) (*MRInfo, error)
+	SubmitPr(PrContent) (*MRInfo, error)
+}
+
+type MRInfo struct {
+	URL string
 }

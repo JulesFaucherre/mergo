@@ -37,7 +37,7 @@ func NewGitlab() (models.Host, error) {
 	}, nil
 }
 
-func (me gitlab) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
+func (me gitlab) SubmitPr(opts models.PrContent) (*models.MRInfo, error) {
 	var err error
 	body := struct {
 		SourceBranch string `json:"source_branch"`
@@ -45,14 +45,14 @@ func (me gitlab) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
 		Title        string `json:"title"`
 		Description  string `json:"description"`
 	}{
-		SourceBranch: opts.Head,
-		TargetBranch: opts.Base,
+		SourceBranch: opts.GetHead(),
+		TargetBranch: opts.GetBase(),
 	}
 
 	url := fmt.Sprintf(
 		"https://gitlab.com/api/v4/projects/%s%%2f%s/merge_requests",
-		opts.Owner,
-		opts.Repo,
+		opts.GetOwner(),
+		opts.GetRepoName(),
 	)
 
 	userInfo, err := hostTools.DefaultGetUserInfo(opts)
