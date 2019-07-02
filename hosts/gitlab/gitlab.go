@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"gitlab.com/jfaucherre/mergo/git"
 	hostTools "gitlab.com/jfaucherre/mergo/hosts/tools"
 	"gitlab.com/jfaucherre/mergo/models"
 	"gitlab.com/jfaucherre/mergo/tools"
@@ -37,7 +38,7 @@ func NewGitlab() (models.Host, error) {
 	}, nil
 }
 
-func (me gitlab) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
+func (me gitlab) SubmitPr(opts *models.CreateOptions, repo *git.Repo) (*models.MRInfo, error) {
 	var err error
 	body := struct {
 		SourceBranch string `json:"source_branch"`
@@ -55,7 +56,7 @@ func (me gitlab) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
 		opts.Repo,
 	)
 
-	userInfo, err := hostTools.DefaultGetUserInfo(opts)
+	userInfo, err := hostTools.DefaultGetUserInfo(opts, repo)
 	if err != nil {
 		return nil, err
 	}

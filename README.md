@@ -12,41 +12,40 @@ go get -u gitlab.com/jfaucherre/mergo
 ```
 ### Usage
 ```bash
+$> mergo --help
+A tool to create pull requests from the command line
+
 Usage:
-  mergo [OPTIONS]
+  mergo [flags]
+  mergo [command]
 
-Application Options:
-  -d, --head=       The head branch you want to merge into the base
-  -b, --base=       The base branch you want to merge into (default: master)
-      --host=       The git host you use, ie github, gitlab, etc.
-      --remote=     The remote to use (default: origin)
-      --repository= The name of the repository on which you want to make the pull request
-      --owner=      The owner of the repository
+Available Commands:
+  create      The command to create a pull request
+  help        Help about any command
 
-Help Options:
-  -h, --help        Show this help message
+Flags:
+  -h, --help      help for mergo
+  -v, --verbose   Use verbose output
+
+Use "mergo [command] --help" for more information about a command.
 ```
 
 ```bash
-$> mergo -d dev -b staging --host=gitlab --owner=jfaucherre --repository=mergo
-Enter the pull request's title:
-My awesome pull request
-<Your git configured editor will then open for you to write your pull request's content>
+$> mergo create -d dev -b staging --host=gitlab --owner=jfaucherre --repository=mergo
+<Your git configured editor will then open for you to write your pull request's title and content>
 ```
 
 If you don't give the repository informations, mergo will take the informations from the git repository you're in
 
 ```bash
 $> mergo
-Enter the pull request's title:
-My awesome pull request
-<Your git configured editor will then open for you to write your pull request's content>
+<Your git configured editor will then open for you to write your pull request's title and content>
 ```
 
 ### Personal config
 As I like to keep all things in one place I have run the following command
 ```bash
-git config --global alias.pr '!mergo'
+git config --global alias.pr '!mergo create'
 ```
 So that I can then run
 ```bash

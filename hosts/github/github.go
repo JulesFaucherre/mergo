@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"gitlab.com/jfaucherre/mergo/git"
 	hostTools "gitlab.com/jfaucherre/mergo/hosts/tools"
 	"gitlab.com/jfaucherre/mergo/models"
 	"gitlab.com/jfaucherre/mergo/tools"
@@ -52,7 +53,7 @@ func NewGithub() (models.Host, error) {
 	return askForCredentials()
 }
 
-func (me github) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
+func (me github) SubmitPr(opts *models.CreateOptions, repo *git.Repo) (*models.MRInfo, error) {
 	var err error
 	body := struct {
 		Head  string `json:"head"`
@@ -64,7 +65,7 @@ func (me github) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
 		Base: opts.Base,
 	}
 
-	userInfo, err := hostTools.DefaultGetUserInfo(opts)
+	userInfo, err := hostTools.DefaultGetUserInfo(opts, repo)
 	if err != nil {
 		return nil, err
 	}

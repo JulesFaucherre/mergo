@@ -82,13 +82,18 @@ func parseContent(content []byte) (string, string) {
 	return strings.Join(titleC, "\n"), strings.Join(bodyC, "\n")
 }
 
-func DefaultGetUserInfo(opts *models.Opts) (*UserInfo, error) {
+func DefaultGetUserInfo(opts *models.CreateOptions, repo *git.Repo) (*UserInfo, error) {
 	userInfo := &UserInfo{}
-	userInfo.Title, userInfo.Body = defaultValues(opts.Commits)
+	commits, err := repo.
+		GetDifferenceCommits(opts.Head, opts.Base)
+	if err != nil {
+		return nil, err
+	}
+	userInfo.Title, userInfo.Body = defaultValues(commits)
 	templ := template.Must(template.New("User info").Parse(baseContent))
 
 	var tpl bytes.Buffer
-	err := templ.Execute(&tpl, userInfo)
+	err = templ.Execute(&tpl, userInfo)
 	content, err := git.EditText([]byte(tpl.String()))
 	if err != nil {
 		return nil, fmt.Errorf("While getting your input got error :\n%+v", err)
