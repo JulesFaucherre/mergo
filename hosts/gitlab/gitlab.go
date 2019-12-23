@@ -52,7 +52,7 @@ func (me gitlab) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
 	url := fmt.Sprintf(
 		"https://gitlab.com/api/v4/projects/%s%%2f%s/merge_requests",
 		opts.Owner,
-		opts.Repo,
+		opts.Repository,
 	)
 
 	userInfo, err := hostTools.DefaultGetUserInfo(opts)

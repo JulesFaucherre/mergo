@@ -12,16 +12,15 @@ import (
 )
 
 var (
-	baseContent = `#  Enter the content of your merge request
-#  Every line starting with one only '#' as well as empty lines will be considered as a comment and not treated
-#  Do not change lines starting with '##' as they are used for parsing
+	baseContent = `# Enter the content of your merge request
+# Please enter your request's title and body. Lines starting with '#' will be
+# ignored, and an empty content aborts the request.
 
-## Title
-#  Note that only the first line will be taken since merge request titles are monoline
+# Title:
 
 {{.Title}}
 
-## Body
+# Body:
 
 {{.Body}}
 
@@ -46,54 +45,42 @@ const (
 	body
 )
 
-func parseContent(content []byte) (string, string) {
-	parsing := none
-	titleC := []string{}
-	bodyC := []string{}
-	for _, line := range strings.Split(string(content), "\n") {
-		line = strings.TrimSpace(line)
+func parseContent(content []byte) (*UserInfo, error) {
+	str := strings.TrimLeft(string(content), " \n\t\r")
+	if tools.IsEmpty(str) {
+		return nil, fmt.Errorf("Aborted request")
+	}
+	lines := []string{}
 
-		// Swap to title parsing
-		if line == "## Title" && len(titleC) == 0 {
-			parsing = title
-			continue
-		}
-		// Swap to body parsing
-		if line == "## Body" && len(bodyC) == 0 {
-			parsing = body
-			continue
-		}
-		// Drop useless lines
-		if tools.IsEmpty(line) || line == "#" || (len(line) > 2 && line[0] == '#' && line[1] != '#') {
-			continue
-		}
-
-		switch parsing {
-		case none:
-			break
-		case title:
-			titleC = append(titleC, line)
-			break
-		case body:
-			bodyC = append(bodyC, line)
-			break
+	for _, l := range strings.Split(str, "\n") {
+		if !strings.HasPrefix(l, "#") {
+			lines = append(lines, l)
 		}
 	}
-	return strings.Join(titleC, "\n"), strings.Join(bodyC, "\n")
+	return &UserInfo{
+		Title: lines[0],
+		Body:  strings.Join(lines[1:], "\n"),
+	}, nil
 }
 
 func DefaultGetUserInfo(opts *models.Opts) (*UserInfo, error) {
 	userInfo := &UserInfo{}
-	userInfo.Title, userInfo.Body = defaultValues(opts.Commits)
+	commits, err := opts.
+		Repo.
+		GetDifferenceCommits(opts.Head, opts.Base)
+	if err != nil {
+		return nil, err
+	}
+	userInfo.Title, userInfo.Body = defaultValues(commits)
 	templ := template.Must(template.New("User info").Parse(baseContent))
 
 	var tpl bytes.Buffer
-	err := templ.Execute(&tpl, userInfo)
+	err = templ.Execute(&tpl, userInfo)
 	content, err := git.EditText([]byte(tpl.String()))
 	if err != nil {
 		return nil, fmt.Errorf("While getting your input got error :\n%+v", err)
 	}
-	userInfo.Title, userInfo.Body = parseContent(content)
+	userInfo, err = parseContent(content)
 	if err != nil {
 		return nil, fmt.Errorf("While parsing your input got error :\n%+v", err)
 	}

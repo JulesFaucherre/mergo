@@ -76,7 +76,7 @@ func (me github) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
 		me.user,
 		me.token,
 		opts.Owner,
-		opts.Repo,
+		opts.Repository,
 	)
 
 	marshaled, err := json.Marshal(body)
