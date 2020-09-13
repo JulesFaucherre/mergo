@@ -53,9 +53,12 @@ func parseContent(content []byte) (*UserInfo, error) {
 	lines := []string{}
 
 	for _, l := range strings.Split(str, "\n") {
-		if !strings.HasPrefix(l, "#") {
+		if !strings.HasPrefix(l, "#") && !tools.IsEmpty(l) {
 			lines = append(lines, l)
 		}
+	}
+	if tools.Verbose {
+		fmt.Printf("user input lines = %+v\n", strings.Join(lines, "\n"))
 	}
 	return &UserInfo{
 		Title: lines[0],
@@ -83,6 +86,9 @@ func DefaultGetUserInfo(opts *models.Opts) (*UserInfo, error) {
 	userInfo, err = parseContent(content)
 	if err != nil {
 		return nil, fmt.Errorf("While parsing your input got error :\n%+v", err)
+	}
+	if tools.Verbose {
+		fmt.Printf("userInfo = %+v\n", userInfo)
 	}
 	return userInfo, nil
 }

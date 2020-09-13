@@ -89,7 +89,11 @@ func (me github) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("Request failed with status %s", resp.Status)
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("request failed with status %s", resp.Status)
+		}
+		return nil, fmt.Errorf("request failed with\n\tstatus: %s\n\tbody: %s", resp.Status, string(body))
 	}
 
 	res := struct {

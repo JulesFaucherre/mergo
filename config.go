@@ -16,7 +16,7 @@ var (
 	sectionName = "mergo"
 )
 
-func isSectionExists(e error) bool {
+func isSectionDoesntExist(e error) bool {
 	return e.Error() == "section '"+sectionName+"' does not exist"
 }
 
@@ -34,7 +34,7 @@ func loadFile(fname string, opts *models.Opts) error {
 
 	// Load section, if section does not exist return
 	s, err := f.GetSection(sectionName)
-	if err != nil && isSectionExists(err) {
+	if err != nil && isSectionDoesntExist(err) {
 		return nil
 	}
 	if err != nil {
@@ -53,6 +53,7 @@ func loadConfig() (*models.Opts, error) {
 	if err := loadFile(globalConfig, opts); err != nil {
 		return nil, err
 	}
+	fmt.Printf("opts = %+v\n", opts)
 
 	// Load local config
 	localGit, _ := git.LocalRepository().GetPath()
@@ -60,9 +61,14 @@ func loadConfig() (*models.Opts, error) {
 	if err := loadFile(localConfig, opts); err != nil {
 		return nil, err
 	}
+	fmt.Printf("opts = %+v\n", opts)
 
 	// Parse args
-	_, err := flags.ParseArgs(opts, os.Args)
+
+	// We have to create a custom parser because the default options prints the
+	// error messages and we would have the errors printed twice
+	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash)
+	_, err := parser.ParseArgs(os.Args)
 	if err != nil {
 		return nil, err
 	}
