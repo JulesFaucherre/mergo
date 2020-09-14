@@ -1,4 +1,4 @@
-package tools
+package credentials
 
 import (
 	"io/ioutil"

@@ -1,91 +1,49 @@
 package git
 
 import (
-	"context"
-	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
-	"gitlab.com/jfaucherre/mergo/tools"
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"gitlab.com/jfaucherre/mergo/logger"
 )
 
 type Repo struct {
-	p string
+	path string
+	repo *git.Repository
+	wt   *git.Worktree
 }
 
-// Repository returns the used repository at path 'repoPath'
-func Repository(repoPath string) *Repo {
-	return &Repo{p: repoPath}
-}
-
-// LocalRepository returns the used repository at pwd
-func LocalRepository() *Repo {
-	pwd, _ := os.Getwd()
-	return Repository(pwd)
-}
-
-// Branch returns a GitCmd to get the active branch of the repository
-func (me *Repo) Branch() *GitCmd {
-	return &GitCmd{
-		repo: me,
-		cmd: [][]string{
-			{"git", "branch"},
-			{"grep", "*"},
-			{"awk", "{print $2}"},
-		},
-	}
-}
-
-// Remote returns the git url for the remote 'remote'
-func (me *Repo) Remote(remote string) *GitCmd {
-	return &GitCmd{
-		repo: me,
-		cmd: [][]string{
-			{"git", "remote", "get-url", remote},
-		},
-	}
-}
-
-type GitCmd struct {
-	repo *Repo
-	cmd  [][]string
-	next func(string, error) (string, error)
-}
-
-// Do runs the GitCmd with the context ctx and returns its result
-func (me *GitCmd) Do(ctx context.Context) (string, error) {
-	if tools.IsEmpty(me.repo.p) || me.cmd == nil {
-		return "", fmt.Errorf("Can not launch any command, repository was not initiated well")
-	}
-	repoPath, err := getGitPath(me.repo.p)
+func New(p string) (*Repo, error) {
+	p, err := getGitPath(p)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	pwd, err := os.Getwd()
+	r, err := git.PlainOpen(p)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if err = os.Chdir(repoPath); err != nil {
-		return "", err
-	}
-
-	if me.next == nil {
-		me.next = func(a string, e error) (string, error) { return a, e }
-	}
-
-	res, err := me.next(run(ctx, me.cmd))
+	wt, err := r.Worktree()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if err = os.Chdir(pwd); err != nil {
-		return "", err
-	}
+	return &Repo{repo: r, wt: wt, path: p}, nil
+}
 
-	return res, nil
+func FromPwd() (*Repo, error) {
+	p, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	return New(p)
 }
 
 func getGitPath(repoPath string) (string, error) {
@@ -103,8 +61,118 @@ func getGitPath(repoPath string) (string, error) {
 		return repoPath, nil
 	}
 	if repoPath == "/" {
-		return "", fmt.Errorf("Unable to find git repository")
+		return "", ErrGitRepositoryNotFound
 	}
 
 	return getGitPath(path.Join(repoPath, ".."))
+}
+
+func (me *Repo) HasChanges() bool {
+	status, _ := me.wt.Status()
+	logger.Debug("changes:\n%+v\n", status)
+	return len(status) != 0
+}
+
+func (me *Repo) GetRemoteURLs(remote string) ([]string, error) {
+	rmt, err := me.repo.Remote(remote)
+	if err == git.ErrRemoteNotFound {
+		return nil, ErrRemoteNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return rmt.Config().URLs, nil
+}
+
+func (me *Repo) GetActualBranch() (string, error) {
+	hd, err := me.repo.Head()
+	if err != nil {
+		return "", err
+	}
+	refName := string(hd.Name())
+	logger.Debug("head reference %s\n", refName)
+	if !strings.HasPrefix(refName, "refs/heads/") {
+		return "", ErrNotABranch
+	}
+	// We remove the "refs/heads/" part
+	name := refName[11:]
+	return name, nil
+}
+
+func (me *Repo) GetBranchCommit(branch string) (*object.Commit, error) {
+	ref, err := me.getBranchReference(branch)
+	if err != nil {
+		return nil, err
+	}
+
+	return me.repo.CommitObject(ref.Hash())
+}
+
+func (me *Repo) getBranchReference(branch string) (*plumbing.Reference, error) {
+	var err error
+	var b *plumbing.Reference
+
+	branches, err := me.repo.Branches()
+	if err != nil {
+		return nil, err
+	}
+	for b, err = branches.Next(); b != nil && err == nil; b, err = branches.Next() {
+		if strings.HasSuffix(string(b.Name()), branch) {
+			return b, nil
+		}
+	}
+	if err == io.EOF {
+		return nil, ErrBranchNotFound
+	}
+	return nil, err
+}
+
+func (me *Repo) GetDifferenceCommit(hd, bs string) ([]string, error) {
+	return nil, nil
+}
+
+func (me *Repo) IsBranchUpToDate(branch string) (bool, error) {
+	rmts, err := me.repo.Remotes()
+	if err != nil {
+		return false, nil
+	}
+	for _, rmt := range rmts {
+		up, err := me.isBranchUpToDate(branch, rmt.Config().Name)
+		if err != nil {
+			return false, err
+		}
+		if !up {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func (me *Repo) isBranchUpToDate(branch, remote string) (bool, error) {
+	rev := plumbing.Revision(remote + "/" + branch)
+	rmtH, err := me.repo.ResolveRevision(rev)
+	if err != nil {
+		return false, err
+	}
+
+	lclRef, err := me.getBranchReference(branch)
+	if err != nil {
+		return false, err
+	}
+
+	lclH := lclRef.Hash()
+	return lclH == *rmtH, nil
+}
+
+func IsDirectChild(parent, child *object.Commit) bool {
+	parents := child.Parents()
+
+	for p, err := parents.Next(); p != nil && err == nil; p, err = parents.Next() {
+		if p.Hash == parent.Hash {
+			return true
+		}
+	}
+	return false
 }
