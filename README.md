@@ -2,49 +2,68 @@
 
 ### Presentation
 
-Have you ever been in the situation where you code in a group project, pushed your work on your remote branch and then comes the moment where you need to create a pull request on your git client in order for your code to be be present on the main branch.  
+This tool comes from my need not to leave my terminal and that, although there is the hub client, you can not create a pull request for any git host you'd like from your terminal  
+So this binary creates pull request from terminal, it has been thought so that it doesn't have your specific host, you can add it easily  
+Its behavior is trying to be as close as possible to the git commands behavior and its default values try to follow the github pull request defaults  
 
-You have to leave your terminal to go on a web interface and then click several button just to create a "github like pull request".  
-The purpose of mergo is to create pull requests without having to leave my beloved terminal.
 ### Install
 ```bash
 go get -u gitlab.com/jfaucherre/mergo
 ```
 ### Usage
 ```bash
+mergo --help
 Usage:
   mergo [OPTIONS]
 
 Application Options:
-  -d, --head=       The head branch you want to merge into the base
-  -b, --base=       The base branch you want to merge into (default: master)
-      --host=       The git host you use, ie github, gitlab, etc.
-      --remote=     The remote to use (default: origin)
-      --repository= The name of the repository on which you want to make the pull request
-      --owner=      The owner of the repository
+  -v, --verbose        Add logs, you can have more logs by calling it more times
+  -d, --head=          The head branch you want to merge into the base (default: the actual checked out branch)
+  -b, --base=          The base branch you want to merge into (default: master)
+  -m, --message=       The pull request message (default: If you have only one commit, it takes this commit's message)
+  -f, --force          Force the pull request, doesn't ask you if you have unstaged changes or things like that
+  -c, --clipboard      Copy the URLs of your merge requests to your clipboard
+      --remote=        The remote to use (default: origin)
+  -r, --remote-url=    The remote URLs to use. Note that this overwrite the "remote" option
+  -e, --force-edition  Force the edition of the message event it already have a value
+      --delete-creds=  Use this option when you want to delete the credentials of an host
 
 Help Options:
-  -h, --help        Show this help message
+  -h, --help           Show this help message
 ```
 
 ```bash
-$> mergo -d dev -b staging --host=gitlab --owner=jfaucherre --repository=mergo
-Enter the pull request's title:
-My awesome pull request
-<Your git configured editor will then open for you to write your pull request's content>
+# placed in a repository on a branch you want to pull into master
+mergo -m "My first pull request with mergo !"
 ```
 
-If you don't give the repository informations, mergo will take the informations from the git repository you're in
+### Configuration
 
+You can configure the default behavior of the binary through the git config by writing to the `mergo` section  
+For example suppose the default branch you want to merge into is not master but staging you can write
 ```bash
-$> mergo
-Enter the pull request's title:
-My awesome pull request
-<Your git configured editor will then open for you to write your pull request's content>
+git config add mergo.base staging
+```
+After that all the pull requests you are going to create with mergo are going to be merged into staging and not master
+
+All the configurable values are:
+  * head
+  * base
+  * force
+  * clipboard
+  * remote
+  * remote-urls
+  * force-edition
+  * verbose
+
+Note that if you want to configure verbose for a certain level (from 1 to 5) you must give an array of boolean and not an int, because of how [the argument parsing lib](https://github.com/jessevdk/go-flags#example) works:
+```bash
+# set log level to 3
+git config add mergo.verbose true,true,true
 ```
 
 ### Personal config
-As I like to keep all things in one place I have run the following command
+In order to use it as any other git command I made an alias of it in git like that
 ```bash
 git config --global alias.pr '!mergo'
 ```
@@ -52,7 +71,6 @@ So that I can then run
 ```bash
 git pr
 ```
-just after I have pushed code on my repository
 
 ### Support
 
@@ -60,4 +78,4 @@ Mergo actually support:
 - github
 - gitlab
 
-Do not hesitate to propose pull request to support more git client
+Do not hesitate to propose pull request to support more git hosts

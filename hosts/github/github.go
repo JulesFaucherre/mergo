@@ -1,157 +1,116 @@
 package github
 
 import (
-	"bufio"
 	"bytes"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
 	"regexp"
 	"strings"
 
-	hostTools "gitlab.com/jfaucherre/mergo/hosts/tools"
+	"gitlab.com/jfaucherre/mergo/credentials"
+	"gitlab.com/jfaucherre/mergo/logger"
 	"gitlab.com/jfaucherre/mergo/models"
 	"gitlab.com/jfaucherre/mergo/tools"
 )
 
 const (
-	ghSeparator    = ';'
-	createTokenURL = "https://github.com/settings/tokens"
+	separator = ';'
+	// IsHostRegexp is a regexp which matches URLs that are github's repositories
 )
 
 var (
-	// Need to be implemented
-	usernameRegex = regexp.MustCompile(".*")
-	baseContent   = []byte(`# Enter the content of your pull request
-# Every line starting with a '#' will be considered as a comment and not treated
-`)
+	IsHostRegexp = regexp.MustCompile("(^(https?://)|(git@))github.com[:/].*$")
+
+	ErrMalformedCredentials = errors.New("malformed github credntials")
 )
 
 type github struct {
-	user  string
-	token string
+	User  []byte `parse-name:"github username" parse-reg:"^.+$"`
+	Token []byte `parse-name:"private token" parse-info:"To generate new tokens go here: https://github.com/settings/tokens" parse-reg:"^.+$"`
 }
 
-func NewGithub() (models.Host, error) {
-	creds, err := tools.GetHostConfig("github")
-	if err != nil && !os.IsNotExist(err) {
+func (me github) Marshal() ([]byte, error) {
+	return append(
+		append(me.User, separator),
+		me.Token...,
+	), nil
+}
+
+func (me *github) Unmarshal(content []byte) error {
+	index := bytes.IndexByte(content, separator)
+	if index == -1 {
+		return ErrMalformedCredentials
+	}
+
+	me.User, me.Token = content[:index], content[index+1:]
+	return nil
+}
+
+func (me github) Name() string {
+	return "github"
+}
+
+func New() (models.Host, error) {
+	gh := github{}
+
+	err := tools.LoadHostCredentials(&gh)
+	if err == credentials.ErrNoHostConfig {
+		err = tools.AskForHostCredentials(&gh)
+	}
+	if err != nil {
 		return nil, err
 	}
 
-	for i, c := range creds {
-		if c == ghSeparator && i != len(creds)-1 {
-			return github{
-				string(creds[0:i]),
-				string(creds[i+1:]),
-			}, nil
-		}
-	}
-
-	return askForCredentials()
+	return &gh, nil
 }
 
-func (me github) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
-	var err error
+func (me github) SubmitPr(params *models.MRParams) (*models.MRInfo, error) {
+	message := strings.Split(params.Message, "\n")
+	title := message[0]
+	description := strings.Join(message[1:], "\n")
 	body := struct {
 		Head  string `json:"head"`
 		Base  string `json:"base"`
 		Title string `json:"title"`
 		Body  string `json:"body"`
 	}{
-		Head: opts.Head,
-		Base: opts.Base,
+		Head:  params.Head,
+		Base:  params.Base,
+		Title: title,
+		Body:  description,
 	}
 
-	userInfo, err := hostTools.DefaultGetUserInfo(opts)
+	infos, err := tools.RepoInfoFromURL(params.URL)
+	logger.Info("repo infos : %+v\n", infos)
 	if err != nil {
 		return nil, err
 	}
-
-	body.Title, body.Body = userInfo.Title, userInfo.Body
 
 	url := fmt.Sprintf(
 		"https://%s:%s@api.github.com/repos/%s/%s/pulls",
-		me.user,
-		me.token,
-		opts.Owner,
-		opts.Repo,
+		me.User,
+		me.Token,
+		infos.Owner,
+		infos.Repo,
 	)
 
-	marshaled, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	reader := bytes.NewReader(marshaled)
-	resp, err := http.Post(url, "application/json", reader)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("Request failed with status %s", resp.Status)
-	}
-
-	res := struct {
+	res := new(struct {
 		HTMLURL string `json:"html_url"`
-	}{}
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
+	})
 
-	if err = json.Unmarshal(b, &res); err != nil {
-		return nil, err
+	status, err := tools.Request(&tools.RequestParams{
+		URL:    url,
+		Method: "POST",
+		Body:   &body,
+		Result: res,
+	})
+	logger.Debug("res = %+v\n", res)
+
+	if status >= 400 {
+		return nil, fmt.Errorf("Request failed with status %d", status)
 	}
 
 	return &models.MRInfo{
 		URL: res.HTMLURL,
 	}, nil
-}
-
-func askForCredentials() (models.Host, error) {
-	g := &github{}
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("We need your credentials for github")
-
-	for {
-		fmt.Println("Please enter your username")
-		v, _ := reader.ReadString('\n')
-		g.user = strings.Trim(v, "\n")
-		if !usernameRegex.MatchString(g.user) {
-			fmt.Println("Invalid github username")
-		} else {
-			break
-		}
-	}
-
-	fmt.Printf(`Please enter an github API token.
-To create a token, please go to this URL: %s
-Note that you must give at least the "repo" rights
-`, createTokenURL)
-	v, _ := reader.ReadString('\n')
-	g.token = strings.Trim(v, "\n")
-
-	keep := ""
-	for {
-		fmt.Println("Do you want these credentials to be kept for next times ([y]/n)?")
-		v, _ = reader.ReadString('\n')
-		keep = strings.Trim(v, "\n")
-		if keep == "" || keep == "y" || keep == "n" {
-			break
-		} else {
-			fmt.Printf("Invalid input: %s\n", keep)
-		}
-	}
-
-	if keep != "n" {
-		sep := string(ghSeparator)
-		content := []byte(g.user + sep + g.token)
-		if err := tools.WriteHostConfig("github", content); err != nil {
-			return nil, err
-		}
-	}
-
-	return g, nil
 }
