@@ -1,140 +1,106 @@
 package gitlab
 
 import (
-	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
+	"regexp"
 	"strings"
 
-	hostTools "gitlab.com/jfaucherre/mergo/hosts/tools"
+	"gitlab.com/jfaucherre/mergo/credentials"
+	"gitlab.com/jfaucherre/mergo/logger"
 	"gitlab.com/jfaucherre/mergo/models"
 	"gitlab.com/jfaucherre/mergo/tools"
 )
 
-const (
-	glPersonalAccessTokenURL = "https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html#creating-a-personal-access-token"
+var (
+	// IsHostRegexp is a regexp which matches URLs that are gitlab's repositories
+	IsHostRegexp = regexp.MustCompile("(^(https?://)|(git@))gitlab.com[:/].*$")
 )
 
 type gitlab struct {
-	token string
+	Token []byte `parse-name:"private token" parse-info:"If you have none, you can get one here: https://gitlab.com/-/profile/personal_access_tokens. Note that you must give api rights" parse-reg:"^.+$"`
 }
 
-func NewGitlab() (models.Host, error) {
-	creds, err := tools.GetHostConfig("gitlab")
-	if err != nil && !os.IsNotExist(err) {
+func (me gitlab) Marshal() ([]byte, error) {
+	return me.Token, nil
+}
+
+func (me *gitlab) Unmarshal(content []byte) error {
+	me.Token = content
+	return nil
+}
+
+func (me gitlab) Name() string {
+	return "gitlab"
+}
+
+func New() (models.Host, error) {
+	gl := gitlab{}
+
+	err := tools.LoadHostCredentials(&gl)
+	if err == credentials.ErrNoHostConfig {
+		err = tools.AskForHostCredentials(&gl)
+	}
+	if err != nil {
 		return nil, err
 	}
 
-	if len(creds) == 0 {
-		return askForGlCredentials()
-	}
-	return gitlab{
-		string(creds),
-	}, nil
+	return &gl, nil
 }
 
-func (me gitlab) SubmitPr(opts *models.Opts) (*models.MRInfo, error) {
-	var err error
+func (me gitlab) SubmitPr(params *models.MRParams) (*models.MRInfo, error) {
+	message := strings.Split(params.Message, "\n")
+	title := message[0]
+	description := strings.Join(message[1:], "<br />")
 	body := struct {
 		SourceBranch string `json:"source_branch"`
 		TargetBranch string `json:"target_branch"`
 		Title        string `json:"title"`
 		Description  string `json:"description"`
 	}{
-		SourceBranch: opts.Head,
-		TargetBranch: opts.Base,
+		SourceBranch: params.Head,
+		TargetBranch: params.Base,
+		Title:        title,
+		Description:  description,
+	}
+
+	infos, err := tools.RepoInfoFromURL(params.URL, "gitlab.com")
+	logger.Info("repo infos %+v\n", infos)
+	if err != nil {
+		return nil, err
 	}
 
 	url := fmt.Sprintf(
-		"https://gitlab.com/api/v4/projects/%s%%2f%s/merge_requests",
-		opts.Owner,
-		opts.Repo,
+		"https://gitlab.com/api/v4/projects/%s%%2F%s/merge_requests",
+		infos.Owner,
+		infos.Repo,
 	)
 
-	userInfo, err := hostTools.DefaultGetUserInfo(opts)
+	res := new(struct {
+		Error   string `json:"error"`
+		Message string `json:"message"`
+		WebURL  string `json:"web_url"`
+	})
+
+	status, err := tools.Request(&tools.RequestParams{
+		URL:    url,
+		Method: "POST",
+		Body:   &body,
+		Headers: map[string]string{
+			"Private-Token": string(me.Token),
+		},
+		Result: res,
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	body.Title = userInfo.Title
-	body.Description = userInfo.Body
-
-	marshaled, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	reader := bytes.NewReader(marshaled)
-
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", url, reader)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Private-Token", me.token)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("Request failed with status %s", resp.Status)
-	}
-
-	res := struct {
-		WebURL string `json:"web_url"`
-	}{}
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = json.Unmarshal(b, &res); err != nil {
-		return nil, err
+	if status >= 400 {
+		logger.Info("res.Error = %+v\n", res.Error)
+		logger.Info("res.Message = %+v\n", res.Message)
+		return nil, fmt.Errorf("Request failed with status %d", status)
 	}
 
 	return &models.MRInfo{
 		URL: res.WebURL,
 	}, nil
-}
-
-func askForGlCredentials() (models.Host, error) {
-	g := &gitlab{}
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("We need your credentials for gitlab")
-
-	for {
-		fmt.Printf("Please enter your gitlab private token\nif you have none, you can get one here: %s\n", glPersonalAccessTokenURL)
-		v, err := reader.ReadString('\n')
-		g.token = strings.Trim(v, "\n")
-		if err == nil && len(g.token) > 0 {
-			break
-		}
-	}
-
-	keep := ""
-	for {
-		fmt.Println("Do you want these credentials to be kept for next times ([y]/n)?")
-		keep, _ = reader.ReadString('\n')
-		keep = strings.Trim(keep, "\n")
-		if keep == "" || keep == "y" || keep == "n" {
-			break
-		} else {
-			fmt.Printf("Invalid input: %s\n", keep)
-		}
-	}
-
-	if keep != "n" {
-		content := []byte(g.token)
-		if err := tools.WriteHostConfig("gitlab", content); err != nil {
-			return nil, err
-		}
-	}
-
-	return g, nil
 }

@@ -1,31 +1,36 @@
 image: golang:latest
 
 variables:
-  PROJECT_NAME: mergo
   REPO_NAME: gitlab.com/jfaucherre/mergo
+  PROJECT_NAME: mergo
 
 before_script:
   - mkdir -p $GOPATH/src/$(dirname $REPO_NAME)
   - ln -svf $CI_PROJECT_DIR $GOPATH/src/$REPO_NAME
   - cd $GOPATH/src/$REPO_NAME
-  - go get -u github.com/golang/dep/cmd/dep
-  - dep ensure
 
 stages:
+  - dep
   - test
   - build
 
+install:
+  stage: dep
+  script:
+    - go mod download
+    - go mod vendor
+
 format:
-    stage: test
-    script:
-      - go fmt $(go list ./... | grep -v /vendor/)
-      - go vet $(go list ./... | grep -v /vendor/)
-      - go test -race $(go list ./... | grep -v /vendor/)
+  stage: test
+  script:
+    - go fmt $(go list ./... | grep -v /vendor/)
+    - go vet $(go list ./... | grep -v /vendor/)
+    - go test -race $(go list ./... | grep -v /vendor/)
 
 compile:
-    stage: build
-    script:
-      - go build -race -ldflags "-extldflags '-static'" -o $CI_PROJECT_DIR/$PROJECT_NAME
-    artifacts:
-      paths:
-        - $PROJECT_NAME
+  stage: build
+  script:
+    - go build -race -ldflags "-extldflags '-static'" -o $CI_PROJECT_DIR/$PROJECT_NAME
+  artifacts:
+    paths:
+      - $PROJECT_NAME
